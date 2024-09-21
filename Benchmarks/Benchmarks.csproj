@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <PackageReference Include="BenchmarkDotNet" Version="0.14.0"/>
+        <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.14.0" />
         <PackageReference Include="Magick.NET-Q8-x64" Version="14.0.0"/>
         <PackageReference Include="NetVips" Version="2.4.1"/>
         <PackageReference Include="NetVips.Native" Version="8.15.3"/>

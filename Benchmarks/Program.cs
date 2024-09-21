@@ -1,4 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Diagnostics.Windows.Configs;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
 using ImageMagick;
@@ -9,8 +10,10 @@ using SkiaSharp;
 
 BenchmarkRunner.Run<ImageResizeBenchmarks>(args: args);
 
+[ShortRunJob(RuntimeMoniker.Net80)]
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net80)]
+[NativeMemoryProfiler]
+[HideColumns("Error", "StdDev", "RatioSD")]
 public class ImageResizeBenchmarks
 {
     // Keep the underlying streams open for reuse in consecutive benchmarks
@@ -74,8 +77,8 @@ public class ImageResizeBenchmarks
         ResetStreams();
 
         using var image = NetVips.Image.NewFromStream(SourceStream);
-        image.ThumbnailImage(width: OutputWidth, height: OutputHeight)
-            .JpegsaveStream(DestinationStream, q: OutputQuality);
+        using var resized = image.ThumbnailImage(width: OutputWidth, height: OutputHeight);
+            resized.JpegsaveStream(DestinationStream, q: OutputQuality);
     }
 
     [Benchmark]
