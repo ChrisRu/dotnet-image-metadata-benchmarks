@@ -46,6 +46,10 @@ public class ImageResizeBenchmarks
         }
 
         await stream.CopyToAsync(SourceStream);
+
+        // Disable libvips operations cache
+        // https://www.libvips.org/API/current/How-it-works.html#:~:text=Operation%20cache
+        NetVips.Cache.Max = 0;
     }
 
     [Benchmark(Baseline = true)]
@@ -76,9 +80,8 @@ public class ImageResizeBenchmarks
     {
         ResetStreams();
 
-        using var image = NetVips.Image.NewFromStream(SourceStream);
-        using var resized = image.ThumbnailImage(width: OutputWidth, height: OutputHeight);
-            resized.JpegsaveStream(DestinationStream, q: OutputQuality);
+        using var resized = NetVips.Image.ThumbnailStream(SourceStream, width: OutputWidth, height: OutputHeight);
+        resized.JpegsaveStream(DestinationStream, q: OutputQuality);
     }
 
     [Benchmark]
