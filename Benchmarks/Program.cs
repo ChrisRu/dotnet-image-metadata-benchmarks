@@ -4,8 +4,8 @@ using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
 using ImageMagick;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Processing;
 using SkiaSharp;
 
 BenchmarkRunner.Run<ImageResizeBenchmarks>(args: args);
@@ -25,7 +25,12 @@ public class ImageResizeBenchmarks
     // Ensure consistent output quality across all libraries
     private const int OutputQuality = 75;
 
-    private static readonly JpegEncoder JpegImageSharpEncoder = new JpegEncoder
+    private static readonly DecoderOptions ImageSharpDecoderOptions = new DecoderOptions
+    {
+        TargetSize = new Size(OutputWidth, OutputHeight),
+    };
+
+    private static readonly JpegEncoder ImageSharpJpegEncoder = new JpegEncoder
     {
         Quality = OutputQuality,
     };
@@ -57,10 +62,13 @@ public class ImageResizeBenchmarks
     {
         ResetStreams();
 
-        using var image = await Image.LoadAsync(SourceStream);
-        image.Mutate(static x => x.Resize(OutputWidth, OutputHeight));
+        using var image = await Image.LoadAsync(ImageSharpDecoderOptions, SourceStream);
 
-        await image.SaveAsync(DestinationStream, JpegImageSharpEncoder);
+        image.Metadata.ExifProfile = null;
+        image.Metadata.IptcProfile = null;
+        image.Metadata.XmpProfile = null;
+
+        await image.SaveAsync(DestinationStream, ImageSharpJpegEncoder);
     }
 
     [Benchmark]
@@ -69,8 +77,10 @@ public class ImageResizeBenchmarks
         ResetStreams();
 
         using var image = new MagickImage(SourceStream);
+
         image.Quality = OutputQuality;
         image.Resize(MagickOutputSize);
+        image.Strip();
 
         await image.WriteAsync(DestinationStream);
     }
@@ -81,7 +91,7 @@ public class ImageResizeBenchmarks
         ResetStreams();
 
         using var resized = NetVips.Image.ThumbnailStream(SourceStream, width: OutputWidth, height: OutputHeight);
-        resized.JpegsaveStream(DestinationStream, q: OutputQuality);
+        resized.JpegsaveStream(DestinationStream, q: OutputQuality, keep: NetVips.Enums.ForeignKeep.Icc);
     }
 
     [Benchmark]
@@ -90,12 +100,12 @@ public class ImageResizeBenchmarks
         ResetStreams();
 
         using var image = SKBitmap.Decode(SourceStream);
-        using var bitmap = new SKBitmap(OutputWidth, OutputHeight);
-        using var canvas = new SKCanvas(bitmap);
+        using var resized = new SKBitmap(OutputWidth, OutputHeight);
+        using var canvas = new SKCanvas(resized);
 
         canvas.DrawBitmap(image, new SKRect(0, 0, OutputWidth, OutputHeight));
 
-        bitmap.Encode(DestinationStream, SKEncodedImageFormat.Jpeg, OutputQuality);
+        resized.Encode(DestinationStream, SKEncodedImageFormat.Jpeg, OutputQuality);
     }
 
     private static void ResetStreams()
