@@ -12,7 +12,6 @@ BenchmarkRunner.Run<ImageResizeBenchmarks>(args: args);
 
 [ShortRunJob(RuntimeMoniker.Net80)]
 [MemoryDiagnoser]
-[NativeMemoryProfiler]
 [HideColumns("Error", "StdDev", "RatioSD")]
 public class ImageResizeBenchmarks
 {
@@ -58,54 +57,56 @@ public class ImageResizeBenchmarks
     }
 
     [Benchmark(Baseline = true)]
-    public async Task ImageSharpResize()
+    public async Task ImageSharpInfo()
     {
         ResetStreams();
 
-        using var image = await Image.LoadAsync(ImageSharpDecoderOptions, SourceStream);
+        var image = await Image.IdentifyAsync(SourceStream);
 
-        image.Metadata.ExifProfile = null;
-        image.Metadata.IptcProfile = null;
-        image.Metadata.XmpProfile = null;
-
-        await image.SaveAsync(DestinationStream, ImageSharpJpegEncoder);
+        var width = image.Width;
+        var height = image.Height;
+        Console.WriteLine($"Image dimensions: {width}x{height}");
     }
 
     [Benchmark]
-    public async Task MagickNetResize()
+    public async Task MagickNetInfo()
     {
         ResetStreams();
 
-        using var image = new MagickImage(SourceStream);
+        var image = new MagickImageInfo(SourceStream);
 
-        image.Quality = OutputQuality;
-        image.Resize(MagickOutputSize);
-        image.Strip();
-
-        await image.WriteAsync(DestinationStream);
+        var width = image.Width;
+        var height = image.Height;
+        Console.WriteLine($"Image dimensions: {width}x{height}");
     }
 
     [Benchmark]
-    public void NetVipsResize()
+    public void NetVipsInfo()
     {
         ResetStreams();
 
-        using var resized = NetVips.Image.ThumbnailStream(SourceStream, width: OutputWidth, height: OutputHeight);
-        resized.JpegsaveStream(DestinationStream, q: OutputQuality, keep: NetVips.Enums.ForeignKeep.Icc);
+        using var image = NetVips.Image.NewFromStream(SourceStream, access: NetVips.Enums.Access.Sequential);
+        var width = image.Width;
+        var height = image.Height;
+        Console.WriteLine($"Image dimensions: {width}x{height}");
     }
 
     [Benchmark]
-    public void SkiaSharpResize()
+    public void SkiaSharpInfo()
     {
         ResetStreams();
 
-        using var image = SKBitmap.Decode(SourceStream);
-        using var resized = new SKBitmap(OutputWidth, OutputHeight);
-        using var canvas = new SKCanvas(resized);
-
-        canvas.DrawBitmap(image, new SKRect(0, 0, OutputWidth, OutputHeight));
-
-        resized.Encode(DestinationStream, SKEncodedImageFormat.Jpeg, OutputQuality);
+        using var skBitmap = SKBitmap.Decode(SourceStream);
+        if (skBitmap != null)
+        {
+            var width = skBitmap.Width;
+            var height = skBitmap.Height;
+            Console.WriteLine($"Image dimensions: {width}x{height}");
+        }
+        else
+        {
+            throw new InvalidOperationException("Failed decoding");
+        }
     }
 
     private static void ResetStreams()
