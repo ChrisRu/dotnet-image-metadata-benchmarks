@@ -4,40 +4,21 @@ using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
 using ImageMagick;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Jpeg;
 using SkiaSharp;
 
-BenchmarkRunner.Run<ImageResizeBenchmarks>(args: args);
+BenchmarkRunner.Run<ImageInfoBenchmarks>(args: args);
 
 [ShortRunJob(RuntimeMoniker.Net80)]
 [MemoryDiagnoser]
+[NativeMemoryProfiler] // Comment out if on Linux/macOS because it's only supported on Windows
 [HideColumns("Error", "StdDev", "RatioSD")]
-public class ImageResizeBenchmarks
+public class ImageInfoBenchmarks
 {
     // Keep the underlying streams open for reuse in consecutive benchmarks
     private static readonly NonClosableMemoryStream SourceStream = new NonClosableMemoryStream();
 
     // Pre-allocate a large buffer to avoid resizing during the benchmark
     private static readonly NonClosableMemoryStream DestinationStream = new NonClosableMemoryStream(capacity: 4 * 1024 * 1024);
-
-    // Ensure consistent output quality across all libraries
-    private const int OutputQuality = 75;
-
-    private static readonly DecoderOptions ImageSharpDecoderOptions = new DecoderOptions
-    {
-        TargetSize = new Size(OutputWidth, OutputHeight),
-    };
-
-    private static readonly JpegEncoder ImageSharpJpegEncoder = new JpegEncoder
-    {
-        Quality = OutputQuality,
-    };
-
-    private const int OutputWidth = 256;
-    private const int OutputHeight = 256;
-
-    private static readonly MagickGeometry MagickOutputSize = new MagickGeometry(OutputWidth, OutputHeight);
 
     [GlobalSetup]
     public async Task GlobalSetup()
@@ -63,9 +44,10 @@ public class ImageResizeBenchmarks
 
         var image = await Image.IdentifyAsync(SourceStream);
 
-        var width = image.Width;
-        var height = image.Height;
-        Console.WriteLine($"Image dimensions: {width}x{height}");
+        if (image.Width != 1374 || image.Height != 1374)
+        {
+            throw new InvalidOperationException("Failed decoding");
+        }
     }
 
     [Benchmark]
@@ -75,9 +57,10 @@ public class ImageResizeBenchmarks
 
         var image = new MagickImageInfo(SourceStream);
 
-        var width = image.Width;
-        var height = image.Height;
-        Console.WriteLine($"Image dimensions: {width}x{height}");
+        if (image.Width != 1374 || image.Height != 1374)
+        {
+            throw new InvalidOperationException("Failed decoding");
+        }
     }
 
     [Benchmark]
@@ -86,9 +69,10 @@ public class ImageResizeBenchmarks
         ResetStreams();
 
         using var image = NetVips.Image.NewFromStream(SourceStream, access: NetVips.Enums.Access.Sequential);
-        var width = image.Width;
-        var height = image.Height;
-        Console.WriteLine($"Image dimensions: {width}x{height}");
+        if (image.Width != 1374 || image.Height != 1374)
+        {
+            throw new InvalidOperationException("Failed decoding");
+        }
     }
 
     [Benchmark]
@@ -96,14 +80,8 @@ public class ImageResizeBenchmarks
     {
         ResetStreams();
 
-        using var skBitmap = SKBitmap.Decode(SourceStream);
-        if (skBitmap != null)
-        {
-            var width = skBitmap.Width;
-            var height = skBitmap.Height;
-            Console.WriteLine($"Image dimensions: {width}x{height}");
-        }
-        else
+        using var image = SKBitmap.Decode(SourceStream);
+        if (image?.Width != 1374 || image.Height != 1374)
         {
             throw new InvalidOperationException("Failed decoding");
         }
